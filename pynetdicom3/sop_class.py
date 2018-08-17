@@ -12,6 +12,7 @@ from pynetdicom3.service_class import (
     StorageServiceClass,
     QueryRetrieveServiceClass,
     BasicWorklistManagementServiceClass,
+    ModalityPerformedProcedureStepServiceClass,
 )
 
 LOGGER = logging.getLogger('pynetdicom3.sop')
@@ -44,6 +45,8 @@ def uid_to_service_class(uid):
         return QueryRetrieveServiceClass
     elif uid in _BASIC_WORKLIST_CLASSES.values():
         return BasicWorklistManagementServiceClass
+    elif uid in _MODALITY_PERFORMED_PROCEDURE_STEP_CLASSES.values():
+        return ModalityPerformedProcedureStepServiceClass
     else:
         raise NotImplementedError(
             "The Service Class for the SOP Class with UID '{}' has not "
@@ -206,11 +209,18 @@ _BASIC_WORKLIST_CLASSES = {
     'ModalityWorklistInformationFind' : '1.2.840.10008.5.1.4.31',
 }
 
+_MODALITY_PERFORMED_PROCEDURE_STEP_CLASSES = {
+    'MPPS' : '1.2.840.10008.3.1.2.3.3',
+}
+
+
+
 # pylint: enable=line-too-long
 _generate_sop_classes(_VERIFICATION_CLASSES)
 _generate_sop_classes(_STORAGE_CLASSES)
 _generate_sop_classes(_QR_CLASSES)
 _generate_sop_classes(_BASIC_WORKLIST_CLASSES)
+_generate_sop_classes(_MODALITY_PERFORMED_PROCEDURE_STEP_CLASSES) # PRR
 
 
 def uid_to_sop_class(uid):

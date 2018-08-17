@@ -137,6 +137,10 @@ for _code in range(0xC000, 0xCFFF + 1):
 MODALITY_WORKLIST_SERVICE_CLASS_STATUS.update(GENERAL_STATUS)
 
 
+# Modality Performed Procedure Step Service Class specific status code values
+MODALITY_PERFORMED_PROCEDURE_STEP_SERVICE_CLASS_STATUS = GENERAL_STATUS
+
+
 def code_to_status(code):
     """Return a Dataset with Status element matching `code`."""
     if isinstance(code, int) and code >= 0:

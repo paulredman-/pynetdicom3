@@ -554,7 +554,8 @@ class DIMSEMessage(object):
         elif cls_type_name in ['N_GET_RSP', 'N_SET_RSP',
                                'N_CREATE_RQ', 'N_CREATE_RSP']:
             self.data_set = primitive.AttributeList
-            self.command_set.CommandDataSetType = 0x0001
+            if self.data_set:
+                self.command_set.CommandDataSetType = 0x0001
         elif cls_type_name == 'N_SET_RQ':
             self.data_set = primitive.ModificationList
             self.command_set.CommandDataSetType = 0x0001

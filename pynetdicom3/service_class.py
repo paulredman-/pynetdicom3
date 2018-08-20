@@ -8,7 +8,9 @@ from pydicom.dataset import Dataset
 from pydicom.uid import UID
 
 from pynetdicom3.dsutils import decode, encode
-from pynetdicom3.dimse_primitives import C_STORE, C_ECHO, C_MOVE, C_GET, C_FIND, N_CREATE
+from pynetdicom3.dimse_primitives import (
+    C_STORE, C_ECHO, C_MOVE, C_GET, C_FIND, N_CREATE, N_SET
+)
 from pynetdicom3.status import (
     VERIFICATION_SERVICE_CLASS_STATUS,
     STORAGE_SERVICE_CLASS_STATUS,
@@ -1391,12 +1393,19 @@ class ModalityPerformedProcedureStepServiceClass(ServiceClass):
     statuses = MODALITY_PERFORMED_PROCEDURE_STEP_SERVICE_CLASS_STATUS
 
     def SCP(self, req, context, info):
+        """ The SCP implementation for the Modality Performed Procedure Step Service Class."""
+
+        if isinstance(req, N_CREATE):
+            return self._create(req, context, info)
+        elif isinstance(req, N_SET):
+            return self._set(req, context, info)
+        else:
+            raise NotImplementedError(
+                "The service class processing for this message {} has not been implemented yet".format(type(req))
+            )
+
+    def _create(self, req, context, info):
         """
-        The SCP implementation for the Modality Performed Procedure Step Service Class.
-
-        Will always return 0x0000 (Success) unless the user returns a different
-        (valid) status value from the `AE.on_n_create` callback.
-
         Parameters
         ----------
         req : pynetdicom3.dimse_primitives.N_CREATE
@@ -1506,4 +1515,118 @@ class ModalityPerformedProcedureStepServiceClass(ServiceClass):
 
         # Send primitive
         self.DIMSE.send_msg(rsp, context.context_id)
+        LOGGER.info("Sent response")
+
+    def _set(self, req, context, info):
+        """
+        Parameters
+        ----------
+        req : pynetdicom3.dimse_primitives.N_SET
+            The N-SET request primitive sent by the peer.
+        context : pynetdicom3.presentation.PresentationContext
+            The presentation context that the SCP is operating under.
+        info : dict
+            A dict containing details about the association.
+
+        See Also
+        --------
+        ae.ApplicationEntity.on_n_set
+        association.Association.send_n_set
+
+        Notes
+        -----
+        **N-SET Request**
+
+        *Parameters*
+
+        TODO
+
+        **N-SET Response**
+
+        *Parameters*
+
+        TODO
+
+        *Status*
+
+        TODO
+
+        Success
+          | ``0x0000`` Success
+
+        Failure
+        TODO
+
+        References
+        ----------
+        TODO
+        """
+        # Build N-SET response primitive
+        rsp = N_SET()
+        rsp.MessageID = req.MessageID
+        rsp.MessageIDBeingRespondedTo = req.MessageID
+        rsp.RequestedSOPClassUID = req.RequestedSOPClassUID
+        rsp.RequestedSOPInstanceUID = req.RequestedSOPInstanceUID
+
+        info['parameters'] = {
+            'message_id' : req.MessageID
+        }
+
+        # Decode and log Identifier
+        transfer_syntax = context.transfer_syntax[0]
+        try:
+            modification_list = decode(req.ModificationList,
+                                transfer_syntax.is_implicit_VR,
+                                transfer_syntax.is_little_endian)
+            LOGGER.info('MPPS SCP Request Modification List:')
+            LOGGER.info('')
+            LOGGER.debug('# DICOM Dataset')
+            for elem in modification_list.iterall():
+                LOGGER.info(elem)
+            LOGGER.info('')
+        except Exception as ex:
+            LOGGER.error("Failed to decode the request's Modification List dataset.")
+            LOGGER.exception(ex)
+            # Failure - Unable to Process - Failed to decode Identifier
+            rsp.Status = 0xC310
+            rsp.ErrorComment = 'Unable to decode the dataset'
+            self.DIMSE.send_msg(rsp, context.context_id)
+            return
+
+        # Try and run the user's on_n_set callback. The callback should return
+        #   the Status as either an int or Dataset, and any failures in the
+        #   callback results in 0x0000 'Success'
+        try:
+            status = self.AE.on_n_set(modification_list, context.as_tuple, info)
+            LOGGER.info("Returned: status=", status)
+            if isinstance(status, Dataset):
+                if 'Status' not in status:
+                    raise AttributeError("The 'status' dataset returned by "
+                                         "'on_n_set' must contain"
+                                         "a (0000,0900) Status element")
+                for elem in status:
+                    if hasattr(rsp, elem.keyword):
+                        setattr(rsp, elem.keyword, elem.value)
+                    else:
+                        LOGGER.warning("The 'status' dataset returned by "
+                                       "'on_n_set' contained an unsupported "
+                                       "Element '%s'.", elem.keyword)
+            elif isinstance(status, int):
+                rsp.Status = status
+            else:
+                raise TypeError("Invalid 'status' returned by 'on_n_set'")
+
+            # Check Status validity
+            if not self.is_valid_status(rsp.Status):
+                LOGGER.warning("Unknown 'status' value returned by 'on_n_set' "
+                               "callback - 0x{0:04x}".format(rsp.Status))
+        except Exception as ex:
+            LOGGER.exception(ex)
+            LOGGER.error("Exception in the 'on_n_set' callback, responding "
+                         "with default 'status' value of 0x0000 (Success).")
+            rsp.Status = 0x0000
+
+        # Send primitive
+        self.DIMSE.send_msg(rsp, context.context_id)
+        LOGGER.info("Sent response")
 

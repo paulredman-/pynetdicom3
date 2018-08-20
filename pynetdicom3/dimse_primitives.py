@@ -1695,13 +1695,22 @@ class N_SET(object):
     def __init__(self):
         self.MessageID = None
         self.MessageIDBeingRespondedTo = None
+
+        # for N_SET_RQ
         self.RequestedSOPClassUID = None
         self.RequestedSOPInstanceUID = None
         self.ModificationList = None
+
+        # for N_SET_RSP
+        # self.AffectedSOPClassUID = None
+        # self.AffectedSOPInstanceUID = None
         self.AttributeList = None
-        self.AffectedSOPClassUID = None
-        self.AffectedSOPInstanceUID = None
+
         self.Status = None
+
+    @property
+    def AffectedSOPClassUID(self):
+        return self.RequestedSOPClassUID
 
     @property
     def is_valid_request(self):
